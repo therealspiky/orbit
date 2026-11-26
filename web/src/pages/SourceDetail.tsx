@@ -9,6 +9,7 @@ import { useOrg } from '../lib/org';
 import { check, supabase } from '../lib/supabase';
 import { WORK_ROLES, type Brief, type Job, type Segment, type Source } from '../lib/types';
 import { Slot, useModules } from '../modules/runtime';
+import { SourceIntelligence, SpeakerMap } from '../components/SourceIntel';
 
 interface Analysis {
   summary: string;
@@ -141,6 +142,8 @@ export function SourceDetailPage() {
               </ol>
             </details>
           )}
+          <SourceIntelligence source={s} canEdit={canEdit} />
+
           {['queued', 'processing'].includes(s.status) && !segments.data && (
             <Empty title="Transcript on its way">Recordings are transcribed with real timestamps. This page updates by itself.</Empty>
           )}
@@ -185,6 +188,8 @@ export function SourceDetailPage() {
               )}
             </div>
           )}
+
+          {segments.data && <SpeakerMap source={s} segments={segments.data} canEdit={canEdit} onSaved={() => void segments.refetch()} />}
 
           <SourceFacts source={s} canEdit={canEdit} onSaved={() => void source.refetch()} />
         </aside>

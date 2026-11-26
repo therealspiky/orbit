@@ -1,6 +1,7 @@
 import { useParams } from '@tanstack/react-router';
 import { Slot } from '../modules/runtime';
 import { ProfileEditor } from '../components/ProfileEditor';
+import { ShowSettings } from '../components/ShowSettings';
 import { Spinner } from '../components/ui';
 import { useOrg } from '../lib/org';
 import { PROFILE_GROUPS } from '../lib/profileFields';
@@ -13,6 +14,7 @@ export function ShowProfilePage() {
   if (!show) return <Spinner />;
   const brand = brands.find((b) => b.id === show.brand_id);
   return (
+    <>
     <ProfileEditor
       key={show.id}
       kind="show"
@@ -28,5 +30,7 @@ export function ShowProfilePage() {
       approveHint="A show, brand or organisation editor needs to approve it."
       missingNotice="No approved profile yet, so Orb.IT cannot write briefs for this show."
     />
+    <ShowSettings showId={show.id} />
+    </>
   );
 }

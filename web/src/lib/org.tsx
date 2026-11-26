@@ -10,6 +10,9 @@ interface OrgState {
   loading: boolean;
   /** The organisation this instance serves (each client runs its own instance). */
   org: Organisation | null;
+  /** Every organisation the user belongs to (multi-tenant instances can have several). */
+  orgs: Organisation[];
+  switchOrg: (id: string) => void;
   memberships: Membership[];
   brands: Brand[];
   shows: Show[];
@@ -59,8 +62,13 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     queryFn: async () => check(await supabase.from('organisations').select('id,name').order('name')) as Organisation[],
   });
 
-  // One organisation per instance: the one the signed-in user belongs to.
-  const org = useMemo(() => (orgs.data ?? [])[0] ?? null, [orgs.data]);
+  // The chosen organisation (remembered per browser), else the first one the user belongs to.
+  const [chosen, setChosen] = useState<string | null>(() => { try { return localStorage.getItem('orbit.org'); } catch { return null; } });
+  const org = useMemo(() => (orgs.data ?? []).find((o) => o.id === chosen) ?? (orgs.data ?? [])[0] ?? null, [orgs.data, chosen]);
+  const switchOrg = (id: string) => {
+    try { localStorage.setItem('orbit.org', id); } catch { /* private mode */ }
+    setChosen(id); qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'orgs' && q.queryKey[0] !== 'my-memberships' });
+  };
 
   const brands = useQuery({
     queryKey: ['brands', org?.id],
@@ -82,6 +90,8 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       userId,
       loading: authLoading || (!!userId && (myMemberships.isLoading || orgs.isLoading)),
       org,
+      orgs: orgs.data ?? [],
+      switchOrg,
       memberships: mine,
       brands: b,
       shows: s,

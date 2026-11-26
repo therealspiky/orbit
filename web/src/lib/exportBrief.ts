@@ -80,3 +80,33 @@ export function download(filename: string, text: string, type = 'text/markdown')
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Approved export package (export_brief_package): copy sheet with credits, clip manifest and labelled external sources. */
+export interface ExportPackage {
+  brief_id: string; version_id: string; exported_at: string;
+  credits: { role: string; person: string }[];
+  clips: { id: string; headline: string; aspect_ratio: string; video_path: string | null; srt_path: string | null; vtt_path: string | null;
+    caption_text: string | null; caption_differs: boolean; music_flag: boolean; start_ms: number; end_ms: number }[];
+  external_sources: { url: string; publisher: string; title: string; published_on: string | null; label: string }[];
+}
+
+export function packageToMarkdown(briefMd: string, pkg: ExportPackage): string {
+  const L: string[] = [briefMd.trimEnd(), '', '---', '', `# Export package (${new Date(pkg.exported_at).toLocaleString()})`, ''];
+  L.push('## Credits', '');
+  if (pkg.credits.length) L.push(...pkg.credits.map((c) => `- ${c.person}: ${c.role.replace(/_/g, ' ')}`));
+  else L.push('No credits recorded.');
+  L.push('', '## Clips', '');
+  if (!pkg.clips.length) L.push('No rendered clips.');
+  for (const c of pkg.clips) {
+    L.push(`- **${c.headline}** (${c.aspect_ratio}, ${clock(c.start_ms)}–${clock(c.end_ms)})`);
+    L.push(`  Files: ${[c.video_path, c.srt_path, c.vtt_path].filter(Boolean).join(', ')}`);
+    if (c.caption_differs) L.push('  Captions were edited and differ from the transcript wording.');
+    if (c.music_flag) L.push('  Contains music or long non-speech: check rights before publishing.');
+  }
+  L.push('', '## External sources (not Orb.IT archive quotes)', '');
+  if (!pkg.external_sources.length) L.push('None confirmed for use.');
+  for (const s of pkg.external_sources) {
+    L.push(`- [EXTERNAL] ${s.title}. ${s.publisher}, ${s.published_on ?? 'date unknown'}. ${s.url}`);
+  }
+  return L.join('\n') + '\n';
+}
