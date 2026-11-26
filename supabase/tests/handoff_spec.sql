@@ -159,6 +159,18 @@ do $$ begin
     'a promise is marked broken with a cited later segment');
 end $$;
 
+-- A transcript correction reaches open promise quotes (they always quote the transcript as it stands)
+insert into promises (org_id, brand_id, show_id, source_id, segment_start, segment_end, start_ms, end_ms, verbatim_text, due_phrase, fingerprint)
+select (select v from t_ids where k='org'), (select v from t_ids where k='joy'), (select v from t_ids where k='tys'),
+       (select v from t_ids where k='src_shared'), 5, 5, 50000, 59000, 'We will fix a saffo road', 'by Friday', 'p2';
+do $$ begin
+  update transcript_segments set text = 'We will fix Asafo road by Friday.'
+   where source_id = (select v from t_ids where k='src_shared') and idx = 5;
+  perform pg_temp.ok((select verbatim_text from promises where fingerprint = 'p2') = 'We will fix Asafo road by Friday.',
+    'a corrected passage updates the open promise quote');
+  perform pg_temp.ok(exists (select 1 from audit_events where action = 'promise.quote_corrected'), 'the quote correction is audited');
+end $$;
+
 -- Web findings: external, editor-gated (US-044) ------------------------------
 insert into web_research_queries (id, org_id, query_text, context_type, context_id, brief_id, status)
 values ('77777777-7777-7777-7777-777777777777', (select v from t_ids where k='org'), 'Asafo Road drains', 'brief',
@@ -203,6 +215,9 @@ begin
     format($q$select public.update_clip(%L, 'Hook', 'Something nobody said.')$q$, c)),
     'producer edits the caption');
   perform pg_temp.ok((select caption_differs from clips where id = c), 'edited captions are flagged as differing from the transcript');
+  perform pg_temp.ok(pg_temp.fails_as('00000000-0000-0000-0000-00000000000b',
+    format($q$select public.update_clip(%L, 'She said the opposite in March', null)$q$, c)),
+    'G4: clip copy cannot carry said-the-opposite wording');
   perform pg_temp.ok(not pg_temp.fails_as('00000000-0000-0000-0000-00000000000b', format('select public.request_clip_render(%L)', c)),
     'producer requests a render');
   perform pg_temp.ok((select count(*) from jobs where kind = 'render_clip' and payload->>'clip_id' = c::text) = 1, 'render job queued');
@@ -229,6 +244,11 @@ do $$ begin
   perform pg_temp.ok(not pg_temp.fails_as('00000000-0000-0000-0000-00000000000f',
     format('select public.owner_approve_brief(%L)', (select v from t_ids where k='brief2'))),
     'the brand owner gives final approval');
+  update sources set twi_beta = true where id = (select origin_source_id from briefs where id = (select v from t_ids where k='brief2'));
+  perform pg_temp.ok(pg_temp.fails_as('00000000-0000-0000-0000-00000000000b',
+    format('select public.export_brief_package(%L)', (select v from t_ids where k='brief2'))),
+    'G8: a Twi-beta citation blocks export until a language review passes');
+  update sources set twi_beta = false where id = (select origin_source_id from briefs where id = (select v from t_ids where k='brief2'));
   perform pg_temp.ok(not pg_temp.fails_as('00000000-0000-0000-0000-00000000000b',
     format('select public.export_brief_package(%L)', (select v from t_ids where k='brief2'))),
     'the approved package exports');

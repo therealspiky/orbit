@@ -1,46 +1,85 @@
-# Status against the product spec
+# Status against the handoff spec
 
-Measured against *Orb.IT Product Vision and Requirements* (30 October 2026). "Built" means code exists and
-has automated tests; nothing here has yet been run on real Joy Prime or Hitz FM material, so no
-acceptance test is passed until the pilot runs it on fresh sources with real keys.
+Measured against the *Orb.IT Product Handoff Specification* (26 November 2026), which supersedes the
+30 October requirements where they differ. "Built" means the code exists and has automated tests.
+"Verified end to end" means it ran in `worker/scripts/demo-run.ts` against a local Supabase stack on
+26 Nov 2026 with a real recording, real local transcription and real clip rendering.
 
-## Built in Phase 1
+**What has not happened yet:** no run on real Joy Prime, Hitz FM or Adom material, and no run with a model
+key. In the end-to-end run, a scripted stand-in wrote the analysis and the three briefs from the real
+transcript, because no `ANTHROPIC_API_KEY` was set. All checks on that output (verbatim quotes, evidence
+matching, review gates) were real. Quality of real model briefs therefore still needs the pilot.
 
-| Spec area | What exists |
+## Day-one loop (§1.4)
+
+| Step | State |
 |---|---|
-| §3 Hierarchy and roles | Organisation > brand > show; nine roles scoped to org, brand or show; enforced in Postgres RLS and workflow functions, not the UI. Archive/restore. |
-| §3/§4 Brand profiles | Station-wide profile (identity, voice, language, standards and exclusions, rights, commercial context, examples), versioned with brand-editor approval. Briefs are written against the approved brand and show profiles and record both versions; a missing brand profile is recorded as an unresolved item, never guessed. |
-| §4 Show profiles | Guided profile covering identity, voice/format, language, boundaries, production, commercial, examples. Versioned drafts, editor approval, side-by-side comparison. Briefs record the profile version used; generation refuses shows without an approved profile. |
-| §5 Ingestion and evidence | Upload with SHA-256 fingerprint, duplicate refusal, immutable originals, worker re-verification, ffprobe validation, chunked transcription with genuine timestamps, uncertainty flags, pasted transcripts/notes (no invented times), versioned corrections that reset dependent evidence. Explicit queued / processing / needs review / ready / failed states; retry of an interrupted upload. |
-| Episode map (content inventory) | After analysis, every distinct conversation in an episode is mapped with playable moments, verbatim hooks, sensitivities, platform formats, and which eligible shows could take it with a distinct one-line treatment each. One click develops a conversation into briefs for the chosen shows; briefs link back to their conversation. Hooks, moments and show eligibility are validated deterministically. |
-| §7 Cross-brand intelligence (core) | One source, several destination shows in one run; each brief sees sister treatments so it must differ. Source sharing scope (show / brand / organisation) enforced at enqueue and again at execution. |
-| §8 Complete brief | Schema-validated brief with decision and fit, evidence, treatment, rundown, guests, production tasks, social package, review flags, continuation, unresolved items. Editable sections, versions, compare, section locks, comments, tasks, statuses from discovered to closed. |
-| §14 Review enforcement | Fact, fairness, privacy, rights, language (+ commercial when flagged) recorded against one version by named reviewers. Final approval only by editors, only when checks pass, evidence is verified, blocking tasks are done. Any edit or source correction withdraws approvals. Audit log. |
-| Instances and modules | One organisation per instance (own Supabase stack per client; set-up works once). Optional modules — brand profiles, recording transcription, episode map, YouTube import — licensed per instance in `instance_modules`, enforced in the database, and removable from the worker and web builds (docs/MODULES.md). |
-| §16 Architecture | Durable jobs with idempotency keys, bounded retries with backoff, heartbeat and stale-job recovery, provenance on every generated version (model, prompt version, profile version, validation report). Transcript treated as untrusted data in prompts. |
-| §14 Languages | English, Pidgin and mixed handled by detection; Twi marked beta, every Twi passage flagged, mandatory language review flag added to briefs. |
+| Group > brands > shows > seasons > episodes | Built and verified. Seasons are optional; an episode's season must belong to the same show. Organisation type (media group, podcast network, agency). |
+| Upload | Built and verified (fingerprint, duplicate refusal, private storage, worker re-check). |
+| Transcript with correction | Built and verified. Providers: OpenAI, Deepgram (speakers), and **local faster-whisper** (no key, about 4x real time on 4 CPU cores, no speaker labels). Corrections are versioned and reach evidence, clips and promise quotes. |
+| Cross-brand recommendations, 3+ shows per source | Built and verified with 3 shows on 3 brands. Shows can opt out of receiving other shows' sources. |
+| Real captioned clips | Built and verified: 9:16 and 16:9 rendered (1:1 supported), captions burned in from the corrected transcript, SRT/VTT sidecars, headline and show label, brand colour from the profile's brand kit, music/non-speech flag. |
+| Review | Built and verified (fact, fairness, privacy, rights, language checks; evidence verification; blocking tasks). |
+| Owner approval | Built and verified. On by default for news and current affairs; export is refused until the brand owner approves. |
+| Export | Built and verified. Package with credits (locked on export), clips, and confirmed external sources labelled as external. No posting to any platform. |
 
-## Acceptance tests (§19)
+## User stories (§5)
 
-| Test | State |
+| Story | State |
 |---|---|
-| AT01 hierarchy and access | Automated database checks pass (tenant isolation, scoped reads/writes, restricted sources leave no trace). Needs a run on the hosted project. |
-| AT02 ingestion and recovery | Fingerprinting, duplicate refusal, retries and failure states built. Not yet run on a fresh 60-minute recording. Large uploads (>50 MB on Supabase free tier) need the size limit raised; resumable uploads are not built. |
-| AT03 evidence traceability | Quote/range/attribution validation built and unit-tested. Needs the 20-claim sample on real output. |
-| AT04 profile effect | Mechanism built (profile-driven prompts, sibling differentiation). Needs editor scoring on four real profiles. |
-| AT05 actionable brief | Schema enforces every component or an unresolved item with owner and next action. Needs 10 real briefs rated. |
-| AT06 rundown and editing | Arithmetic check, versioning, provenance built. **Targeted AI regeneration that preserves locked sections is not built** (locks currently guard manual edits). |
-| AT07 actual media | **Not built** — Phase 2 (clip rendering, captions, thumbnails). Social assets show "planned, not rendered". |
-| AT08 review enforcement | Automated database checks pass. |
-| AT09 post-show and series | **Not built** — Phase 2. |
-| AT10 memory correction | Correction propagation and access revocation covered by database checks. Editorial memory search is not built. |
-| AT11 guests and advertisers | **Not built** — guests are roles only; directories come in P1. |
-| AT12 connectors and languages | YouTube link import built (official API: details for any public video, captions for connected channels, paste fallback); SRT/VTT/Word transcripts supported. **RSS ingestion not built.** Not yet run against live YouTube. |
+| US-001 group and brands | Built. Single- or multi-tenant instance; org switcher in the app. |
+| US-002 show profile | Built (existing), plus brand kit fields used by clip rendering. |
+| US-003 scoped roles | Built (existing). Commercial role added to the wall below. |
+| US-010 upload | Built. Resumable uploads are not built; very large files depend on the storage limit. |
+| US-011 transcription and correction | Built. Word error rate is not measured or displayed (G10). |
+| US-012 Twi beta | Built: every Twi passage flagged; export is blocked until a language review passes (G8). |
+| US-013 speaker identity | Built: people directory, map a speaker label to a person for the whole source, "unidentified speaker" otherwise (G2). Needs diarised transcription to have labels. |
+| US-020 cross-show opportunities with citations | Built. |
+| US-021 missed follow-up questions | Built in analysis and the post-show report. |
+| US-022 brief workspace | Built; new tabs for clips, archive recall, external research, credits and export. |
+| US-023 assign work | Built (existing tasks) plus in-app notifications on assignment. |
+| US-030 social assets | Clips built. Thumbnails and quote cards are not rendered. |
+| US-031 editorial and owner approval | Built. |
+| US-032 export, no posting | Built. |
+| US-040 guest prep sheet | Built: past quotes with player, open promises, possible tensions (labelled as flags), download as Markdown. |
+| US-041 recall flags | Built after each transcript (post-show), not live during a broadcast. "Possible tension" flags need a model key and two validated citations. |
+| US-042 topic recall | Built with Postgres full-text search, tenant filter inside the query (G7). **Embeddings (semantic search) are not built**, so recall matches words, not meaning. |
+| US-043 promise tracker | Built: candidates from analysis with suggested due date, producer confirms, nudges before and after due, resolution needs evidence. |
+| US-044 web research | Built behind a search provider (Brave or Tavily) on the worker. **Not run against a live search API yet** (no key in this environment). Findings carry a fixed external label and need an editor to confirm before use. |
+| US-050 credit ledger | Built: credits written from workflow actions, editable before export, locked after. |
+| US-051 people metrics | Built: airtime computed from mapped speakers, other figures need an evidence link, owner approval, equal split across credited presenters and producers when not attributed to one person. Only approved figures show. |
+| US-060 audit log | Built; audit and approval records are immutable. |
+| US-061 sales wall | Built in the database: commercial-only users see approved inventory only, never sources, transcripts, drafts, clips or unapproved figures. |
 
-## Next, in order
+## Guardrails (§8.2)
 
-1. **Pilot run (phase 0 exit):** hosted Supabase, keys, 10 representative recordings incl. Pidgin and code-switching; measure word error rate and brief usefulness with editors.
-2. **Targeted revision:** "rewrite this section" with locked sections preserved.
-3. **Media worker (Phase 2):** 9:16 H.264/AAC clip render from evidence ranges, burned-in and SRT/VTT captions, thumbnails, audiogram for audio-only, render states and checksums.
-4. **Post-show report and follow-up:** attach aired recording to the planned episode, plan-vs-aired comparison, linked next-episode proposal.
-5. **Editorial memory search, guest and advertiser records, YouTube/RSS ingestion, resumable uploads.**
+| ID | State |
+|---|---|
+| G1 verbatim quotes | Enforced in the worker (briefs, commitments, tensions) and in the database for clips. |
+| G2 named speakers | Enforced in the UI and recall; names only from mapped people. |
+| G3 external findings never archive quotes | Enforced (separate table, fixed label, never in recall). |
+| G4 flag wording never leaves | Enforced in the database: clip copy and exported social copy reject possible-tension wording and flag summaries. |
+| G5 unapproved metrics hidden | Enforced by RLS and the approved-only view. |
+| G6 sales cannot read drafts | Enforced by RLS; covered by database tests. |
+| G7 tenant filter in search | Enforced inside the recall query; tested with two tenants. Applies to embeddings when they are added. |
+| G8 Twi beta blocks export | Enforced in the export function. |
+| G9 uncertainty | Prompted; unmatched quotes are removed. |
+| G10 no invented figures | No WER, reach estimates or scores shown. |
+| G11 rights flags | Music flag reads "review rights", never "cleared". |
+| G12 model-improvement opt-in | Defaults false on new organisations. No pipeline uses corrections for training. |
+
+## Not built yet
+
+- Embeddings / semantic recall (pgvector). Full-text search stands in.
+- Live in-broadcast flags (flags run after a transcript is ready).
+- Thumbnails, quote cards and audiograms as separate assets (audiogram look is used for audio-only clips).
+- Trusted-source lists per group and alerts on tracked people or stories.
+- Email or WhatsApp notifications (in-app only).
+- Resumable uploads; RSS ingestion.
+
+## Before the pilot
+
+1. Add `ANTHROPIC_API_KEY` (and optionally `SEARCH_API_KEY`, `DEEPGRAM_API_KEY`) to the worker and rerun
+   `worker/scripts/demo-run.ts` on a real hour of Joy Prime or Hitz FM.
+2. Have editors score 10 real briefs and 20 citations (AT03 to AT05).
+3. Apply migrations 10 to 14 to the hosted project and run `supabase/tests/run.sh` there.
