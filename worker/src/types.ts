@@ -13,6 +13,7 @@ export interface SourceRow {
   org_id: string;
   brand_id: string;
   show_id: string | null;
+  episode_id?: string | null;
   kind: 'recording' | 'transcript' | 'notes';
   title: string;
   programme_name: string | null;
@@ -36,7 +37,8 @@ export interface SourceRow {
 export interface JobRow {
   id: string;
   org_id: string;
-  kind: 'transcribe' | 'analyse' | 'generate_briefs' | 'map_episode' | 'youtube_import' | 'youtube_connect';
+  kind: 'transcribe' | 'analyse' | 'generate_briefs' | 'map_episode' | 'youtube_import' | 'youtube_connect'
+    | 'render_clip' | 'web_research' | 'recall_flags' | 'promise_nudges';
   payload: Record<string, unknown>;
   attempts: number;
   max_attempts: number;

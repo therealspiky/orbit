@@ -24,5 +24,6 @@ for f in "$ROOT"/supabase/migrations/*.sql; do
   "${PSQL[@]}" -f "$f" orbit_test
 done
 echo "test: security_and_workflow.sql"
-"${PSQL[@]}" -f "$HERE/security_and_workflow.sql" orbit_test
+echo "test: handoff_spec.sql (same session: shares the pg_temp helpers and fixtures)"
+"${PSQL[@]}" -f "$HERE/security_and_workflow.sql" -f "$HERE/handoff_spec.sql" orbit_test
 echo "ALL DATABASE TESTS PASSED"

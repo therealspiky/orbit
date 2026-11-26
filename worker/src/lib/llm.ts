@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { z } from 'zod';
 import { toolSchema } from './schemas.js';
+import { PermanentError } from '../types.js';
 
 export interface StructuredCall<T> {
   model: string;
@@ -35,14 +36,17 @@ export class AnthropicLlm implements LlmClient {
    * Keys not scoped to a workspace in the Anthropic Console must name the
    * workspace on every request (anthropic-workspace-id header).
    */
+  private configured: boolean;
   constructor(apiKey: string, workspaceId?: string) {
+    this.configured = Boolean(apiKey);
     this.client = new Anthropic({
-      apiKey, maxRetries: 3,
+      apiKey: apiKey || 'not-configured', maxRetries: 3,
       defaultHeaders: workspaceId ? { 'anthropic-workspace-id': workspaceId } : undefined,
     });
   }
 
   async structured<T>(call: StructuredCall<T>): Promise<StructuredResult<T>> {
+    if (!this.configured) throw new PermanentError('ANTHROPIC_API_KEY is not set on the worker, so AI analysis and briefs cannot run.');
     const system: Anthropic.TextBlockParam[] = [{ type: 'text', text: call.system }];
     if (call.cachedContext) {
       system.push({ type: 'text', text: call.cachedContext, cache_control: { type: 'ephemeral' } });

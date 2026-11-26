@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { EvidenceRail } from '../components/brief/EvidenceRail';
 import { DiscussionPanel, TasksPanel, VersionsPanel } from '../components/brief/Panels';
 import { ReviewPanel } from '../components/brief/ReviewPanel';
+import { ArchivePanel, CreditsExportPanel, ExternalPanel, StudioPanel } from '../components/brief/SpecPanels';
 import {
   ContinuationSection, DecisionSection, GuestsSection, RundownSection, SectionHead, SocialSection, TreatmentSection,
 } from '../components/brief/Sections';
 import { BriefBadge, ErrorNote, Spinner } from '../components/ui';
 import { Slot } from '../modules/runtime';
-import { briefToMarkdown, download } from '../lib/exportBrief';
+import { briefToMarkdown, download, packageToMarkdown, type ExportPackage } from '../lib/exportBrief';
 import { ago } from '../lib/format';
 import { useOrg, usePeople } from '../lib/org';
 import { check, supabase } from '../lib/supabase';
@@ -19,7 +20,7 @@ import {
   type Comment, type Evidence, type ReviewDecision, type Segment, type Source, type Task,
 } from '../lib/types';
 
-type Tab = 'decision' | 'treatment' | 'rundown' | 'guests' | 'social' | 'continuation' | 'tasks' | 'review' | 'versions' | 'discussion';
+type Tab = 'decision' | 'treatment' | 'rundown' | 'guests' | 'social' | 'continuation' | 'clips' | 'archive' | 'external' | 'tasks' | 'review' | 'credits' | 'versions' | 'discussion';
 const TABS: { key: Tab; label: string; lockable?: boolean }[] = [
   { key: 'decision', label: 'Angle and fit', lockable: true },
   { key: 'treatment', label: 'Treatment', lockable: true },
@@ -27,8 +28,12 @@ const TABS: { key: Tab; label: string; lockable?: boolean }[] = [
   { key: 'guests', label: 'Guests', lockable: true },
   { key: 'social', label: 'Social package', lockable: true },
   { key: 'continuation', label: 'After the show', lockable: true },
+  { key: 'clips', label: 'Clips studio' },
+  { key: 'archive', label: 'Archive recall' },
+  { key: 'external', label: 'External research' },
   { key: 'tasks', label: 'Tasks' },
   { key: 'review', label: 'Review and approval' },
+  { key: 'credits', label: 'Credits and export' },
   { key: 'versions', label: 'Versions' },
   { key: 'discussion', label: 'Discussion' },
 ];
@@ -141,12 +146,20 @@ export function BriefWorkspace() {
   const tabMeta = TABS.find((t) => t.key === tab)!;
   const openBlocking = (tasks.data ?? []).filter((t) => t.blocking && t.status !== 'done').length;
 
-  function exportMd() {
-    const md = briefToMarkdown({
+  function exportPackage(pkg: Record<string, unknown>) {
+    download(`${current!.content.title.replace(/[^\w]+/g, '-').slice(0, 60)}-v${current!.version}-package.md`,
+      packageToMarkdown(briefMd(), pkg as unknown as ExportPackage));
+    download(`brief-${b!.id}-v${current!.version}-manifest.json`, JSON.stringify(pkg, null, 2), 'application/json');
+  }
+  function briefMd() {
+    return briefToMarkdown({
       brief: b!, version: { ...current!, content: draft! }, evidence: evidence.data ?? [], decisions: decisions.data ?? [],
       tasks: tasks.data ?? [], showName: showName(b!.show_id), brandName: brandName(b!.brand_id),
       sourceTitle: source.data?.title ?? null, person,
     });
+  }
+  function exportMd() {
+    const md = briefMd();
     download(`${draft!.title.replace(/[^\w]+/g, '-').slice(0, 60)}-v${current!.version}.md`, md);
   }
   function exportJson() {
@@ -246,6 +259,13 @@ export function BriefWorkspace() {
             <ReviewPanel brief={b} versionId={current.id} versionNumber={current.version} content={current.content}
               decisions={decisions.data ?? []} blockers={blockers.data ?? []} canReview={canReview} canApprove={canEditorial}
               dirty={dirty} onChanged={refreshAll} />
+          )}
+          {tab === 'clips' && <StudioPanel brief={b} content={current.content} segments={segments.data ?? []} source={source.data ?? null} canWork={canWork && !closed} />}
+          {tab === 'archive' && <ArchivePanel brief={b} content={current.content} />}
+          {tab === 'external' && <ExternalPanel brief={b} canWork={canWork} canEditorial={canEditorial} />}
+          {tab === 'credits' && (
+            <CreditsExportPanel brief={b} canWork={canWork} canEditorial={canEditorial}
+              canOwner={can(['org_admin', 'brand_editor'], b.brand_id, null)} onChanged={refreshAll} exportCopy={exportPackage} />
           )}
           {tab === 'versions' && <VersionsPanel versions={versions.data ?? []} />}
           {tab === 'discussion' && <DiscussionPanel briefId={b.id} orgId={org!.id} userId={userId!} comments={comments.data ?? []} canComment={canReview || canWork} onChanged={() => void comments.refetch()} />}

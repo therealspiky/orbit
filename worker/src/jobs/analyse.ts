@@ -4,6 +4,8 @@ import { audit, getSegments, getSource, jobProgress, type Db } from '../lib/db.j
 import { estimateTokens, type LlmClient } from '../lib/llm.js';
 import { ANALYSIS_PROMPT_VERSION, ANALYSIS_SYSTEM, describeSource, renderTranscript } from '../lib/prompts.js';
 import { AnalysisSchema, type Analysis } from '../lib/schemas.js';
+import { normaliseForMatch } from '../lib/validateBrief.js';
+import { runIntelligence } from './intelligence.js';
 import type { ModuleState } from '../modules/types.js';
 import { PermanentError, type JobRow, type Segment, type SourceRow } from '../types.js';
 
@@ -27,7 +29,17 @@ export function cleanAnalysis(a: Analysis, segments: Segment[]): Analysis {
     claims: a.claims.filter(ok).map((c) => ({ ...c, speaker: c.speaker && speakers.has(c.speaker) ? c.speaker : null })),
     usable_moments: a.usable_moments.filter(ok),
     sensitivities: a.sensitivities.filter(ok),
+    // A commitment survives only if its quote is verbatim inside the cited passage (G1).
+    commitments: (a.commitments ?? []).filter(ok).filter((c) => quoteInRange(c.quote, segments, c.segment_start, c.segment_end))
+      .map((c) => ({ ...c, speaker: c.speaker && speakers.has(c.speaker) ? c.speaker : null })),
+    follow_up_questions: (a.follow_up_questions ?? []).filter(ok),
   };
+}
+
+export function quoteInRange(quote: string, segments: Segment[], start: number, end: number): boolean {
+  const text = segments.filter((s) => s.idx >= start && s.idx <= end).map((s) => s.text).join(' ');
+  const q = normaliseForMatch(quote);
+  return q.length > 0 && normaliseForMatch(text).includes(q);
 }
 
 /** Returns the current analysis for a source, running the extraction pass if missing or stale. */
@@ -69,10 +81,13 @@ export async function runAnalyse(job: JobRow, deps: AnalyseDeps): Promise<Record
   if (!segments.length) throw new PermanentError('Source has no transcript yet');
   await jobProgress(deps.db, job.id, 20, 'Extracting themes, claims and usable moments');
   const { analysis, reused } = await ensureAnalysis(deps.db, deps.cfg, deps.llm, src, segments);
+  // Promise candidates, recall flags and the post-show report for this transcript version.
+  await jobProgress(deps.db, job.id, 70, 'Checking the archive and promises');
+  const intel = await runIntelligence(deps, src, segments, analysis);
   // Next, when the episode map module is on: map the episode's conversations.
   if (deps.modules?.isEnabled('episode_map')) await deps.db.from('jobs').upsert({
     org_id: src.org_id, kind: 'map_episode', payload: { source_id: src.id },
     idempotency_key: `map:${src.id}:${transcriptFingerprint(segments)}`, created_by: job.created_by,
   }, { onConflict: 'org_id,idempotency_key', ignoreDuplicates: true });
-  return { reused, themes: analysis.themes.length, claims: analysis.claims.length };
+  return { reused, themes: analysis.themes.length, claims: analysis.claims.length, ...intel };
 }

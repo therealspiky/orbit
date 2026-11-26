@@ -9,6 +9,9 @@ import { ReviewsPage } from './pages/Reviews';
 import { ShowProfilePage } from './pages/ShowProfile';
 import { SourceDetailPage } from './pages/SourceDetail';
 import { SourcesPage } from './pages/Sources';
+import { PeoplePage, PersonPage } from './pages/People';
+import { PromisesPage } from './pages/Promises';
+import { InventoryPage, MetricsPage, NotificationsPage, RecallPage } from './pages/Insights';
 import { INSTALLED_MODULES } from './modules/registry';
 
 const root = createRootRoute({ component: () => <Outlet /> });
@@ -24,11 +27,18 @@ const sourceDetail = createRoute({ getParentRoute: () => app, path: '/sources/$s
 const briefs = createRoute({ getParentRoute: () => app, path: '/briefs', component: BriefsPage });
 const brief = createRoute({ getParentRoute: () => app, path: '/briefs/$briefId', component: BriefWorkspace });
 const reviews = createRoute({ getParentRoute: () => app, path: '/reviews', component: ReviewsPage });
+const people = createRoute({ getParentRoute: () => app, path: '/people', component: PeoplePage });
+const person = createRoute({ getParentRoute: () => app, path: '/people/$personId', component: PersonPage });
+const promises = createRoute({ getParentRoute: () => app, path: '/promises', component: PromisesPage });
+const recall = createRoute({ getParentRoute: () => app, path: '/recall', component: RecallPage });
+const metrics = createRoute({ getParentRoute: () => app, path: '/scorecards', component: MetricsPage });
+const inventory = createRoute({ getParentRoute: () => app, path: '/inventory', component: InventoryPage });
+const notifications = createRoute({ getParentRoute: () => app, path: '/notifications', component: NotificationsPage });
 
 const routeTree = root.addChildren([
   login, onboarding,
   app.addChildren([
-    home, admin, showProfile, sources, sourceDetail, briefs, brief, reviews,
+    home, admin, showProfile, sources, sourceDetail, briefs, brief, reviews, people, person, promises, recall, metrics, inventory, notifications,
     // Installed modules add their own pages; they show a notice if the module is not licensed.
     ...INSTALLED_MODULES.flatMap((m) => m.routes?.(app) ?? []),
   ]),

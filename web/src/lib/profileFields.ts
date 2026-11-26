@@ -84,6 +84,15 @@ export const PROFILE_GROUPS: ProfileGroup[] = [
       { key: 'unsuitable', label: 'Unsuitable treatments (and why)', kind: 'list' },
     ],
   },
+  {
+    key: 'brand_kit', title: 'Brand kit for clips',
+    intro: 'Used when Orb.IT renders captioned clips: headline band and audiogram background.',
+    fields: [
+      { key: 'primary_colour', label: 'Primary colour (hex, e.g. #E63946)', kind: 'text' },
+      { key: 'secondary_colour', label: 'Secondary colour (hex)', kind: 'text' },
+      { key: 'lower_third_notes', label: 'Lower-third and logo notes', kind: 'long' },
+    ],
+  },
 ];
 
 /**

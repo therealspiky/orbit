@@ -7,7 +7,7 @@ function req(name: string): string {
   return v;
 }
 
-export type TranscribeProvider = 'openai' | 'deepgram';
+export type TranscribeProvider = 'openai' | 'deepgram' | 'local';
 
 export interface Config {
   supabaseUrl: string;
@@ -19,6 +19,12 @@ export interface Config {
   openaiTranscribeModel: string;
   deepgramKey?: string;
   deepgramModel: string;
+  /** Local faster-whisper (TRANSCRIBE_PROVIDER=local): CTranslate2 model folder and Python with faster-whisper. */
+  whisperModelDir?: string;
+  whisperPython: string;
+  /** Web search for the research layer (optional). */
+  searchProvider?: 'brave' | 'tavily';
+  searchApiKey?: string;
   analysisModel: string;
   briefModel: string;
   workerId: string;
@@ -41,13 +47,14 @@ function loadDotEnv() {
 export function loadConfig(): Config {
   loadDotEnv();
   const transcribeProvider = (process.env.TRANSCRIBE_PROVIDER ?? 'openai') as TranscribeProvider;
-  if (!['openai', 'deepgram'].includes(transcribeProvider)) {
-    throw new Error(`TRANSCRIBE_PROVIDER must be openai or deepgram, got ${transcribeProvider}`);
+  if (!['openai', 'deepgram', 'local'].includes(transcribeProvider)) {
+    throw new Error(`TRANSCRIBE_PROVIDER must be openai, deepgram or local, got ${transcribeProvider}`);
   }
   const cfg: Config = {
     supabaseUrl: req('SUPABASE_URL'),
     supabaseServiceKey: req('SUPABASE_SERVICE_ROLE_KEY'),
-    anthropicKey: req('ANTHROPIC_API_KEY'),
+    // Optional so transcription, clips and web research run without it; AI jobs refuse clearly when it is missing.
+    anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
     anthropicWorkspaceId: process.env.ANTHROPIC_WORKSPACE_ID || undefined,
     transcribeProvider,
     openaiKey: process.env.OPENAI_API_KEY,
@@ -55,6 +62,10 @@ export function loadConfig(): Config {
     openaiTranscribeModel: process.env.OPENAI_TRANSCRIBE_MODEL ?? 'whisper-1',
     deepgramKey: process.env.DEEPGRAM_API_KEY,
     deepgramModel: process.env.DEEPGRAM_MODEL ?? 'nova-3',
+    whisperModelDir: process.env.WHISPER_MODEL_DIR || undefined,
+    whisperPython: process.env.WHISPER_PYTHON ?? 'python3',
+    searchProvider: (process.env.SEARCH_PROVIDER as 'brave' | 'tavily' | undefined) || undefined,
+    searchApiKey: process.env.SEARCH_API_KEY || undefined,
     analysisModel: process.env.ANALYSIS_MODEL ?? 'claude-haiku-5-5',
     briefModel: process.env.BRIEF_MODEL ?? 'claude-sonnet-5-5',
     workerId: process.env.WORKER_ID ?? `${hostname()}-${process.pid}`,

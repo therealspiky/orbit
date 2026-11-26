@@ -5,7 +5,7 @@ import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { PermanentError } from '../types.js';
 
-function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+export function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
@@ -89,5 +89,13 @@ export async function extractAudio(input: string, workDir: string): Promise<stri
   const out = join(workDir, 'audio.mp3');
   await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-vn', '-ac', '1', '-ar', '16000',
     '-c:a', 'libmp3lame', '-b:a', '48k', out]);
+  return out;
+}
+
+/** Raw float32 mono 16 kHz PCM, the input format of the local faster-whisper script. */
+export async function extractPcmF32(input: string, workDir: string): Promise<string> {
+  const out = join(workDir, 'audio.f32');
+  await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-vn', '-ac', '1', '-ar', '16000',
+    '-f', 'f32le', out]);
   return out;
 }

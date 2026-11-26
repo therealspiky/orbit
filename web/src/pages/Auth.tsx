@@ -69,13 +69,14 @@ export function LoginPage() {
 export function OnboardingPage() {
   const { session, org, loading, refresh } = useOrg();
   const navigate = useNavigate();
+  const [orgType, setOrgType] = useState('media_group');
   const [name, setName] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const status = useQuery({
     queryKey: ['instance-status', session?.user.id],
     enabled: !!session,
-    queryFn: async () => check(await supabase.rpc('instance_status')) as { has_organisation: boolean; organisation_name: string | null; is_member: boolean },
+    queryFn: async () => check(await supabase.rpc('instance_status')) as { tenancy: 'single' | 'multi'; has_organisation: boolean; organisation_name: string | null; is_member: boolean },
   });
 
   if (!loading && !session) return <Navigate to="/login" />;
@@ -83,7 +84,7 @@ export function OnboardingPage() {
   if (status.isLoading) return null;
 
   // The instance already belongs to an organisation: new people are added by its administrators.
-  if (status.data?.has_organisation) {
+  if (status.data?.has_organisation && status.data.tenancy !== 'multi') {
     return (
       <div className="max-w-[560px] mx-auto px-6 py-16">
         <h1 className="text-2xl font-semibold">Almost there</h1>
@@ -102,7 +103,7 @@ export function OnboardingPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
-    const { error } = await supabase.rpc('create_organisation', { p_name: name.trim() });
+    const { error } = await supabase.rpc('create_organisation', { p_name: name.trim(), p_type: orgType });
     setBusy(false);
     if (error) return setError(error);
     refresh();
@@ -119,6 +120,12 @@ export function OnboardingPage() {
       <form onSubmit={submit} className="mt-8 space-y-4">
         <Field label="Organisation name" help="For example, the media group that owns your stations and channels.">
           <input className="field-input" value={name} onChange={(e) => setName(e.target.value)} required />
+        </Field>
+        <Field label="Type of organisation" help="Brands are stations for a media group, shows for a podcast network, or clients for an agency.">
+          <select className="field-input" value={orgType} onChange={(e) => setOrgType(e.target.value)}>
+            <option value="media_group">Media group</option><option value="podcast_network">Podcast network</option>
+            <option value="agency">Agency</option><option value="other">Other</option>
+          </select>
         </Field>
         <ErrorNote error={error} />
         <button className="btn btn-primary" disabled={busy || !name.trim()}>Create organisation</button>

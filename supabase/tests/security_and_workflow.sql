@@ -93,11 +93,13 @@ select public.add_member((select v from t_ids where k='org'), 'sales@orbit.test'
 reset role;
 commit;
 
--- Single-instance guard: nobody can create a second organisation from the app.
+-- Single-instance guard: on an instance configured as single-client, nobody can create a second organisation.
+update instance_config set value = '"single"' where key = 'tenancy';
 do $$ begin
   perform pg_temp.ok(pg_temp.fails_as('00000000-0000-0000-0000-00000000000d', $q$select public.create_organisation('Other Group')$q$),
     'a second organisation cannot be created on an instance');
 end $$;
+update instance_config set value = '"multi"' where key = 'tenancy';
 -- Defence in depth: tenant isolation still holds if a second organisation exists (inserted by the system).
 insert into organisations (id, name) values ('99999999-9999-9999-9999-999999999999', 'Other Group');
 insert into memberships (org_id, user_id, role) values ('99999999-9999-9999-9999-999999999999', '00000000-0000-0000-0000-00000000000d', 'org_admin');
