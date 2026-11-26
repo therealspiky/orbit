@@ -13,6 +13,7 @@ export interface SourceRow {
   org_id: string;
   brand_id: string;
   show_id: string | null;
+  episode_id?: string | null;
   kind: 'recording' | 'transcript' | 'notes';
   title: string;
   programme_name: string | null;

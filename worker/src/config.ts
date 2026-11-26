@@ -53,7 +53,8 @@ export function loadConfig(): Config {
   const cfg: Config = {
     supabaseUrl: req('SUPABASE_URL'),
     supabaseServiceKey: req('SUPABASE_SERVICE_ROLE_KEY'),
-    anthropicKey: req('ANTHROPIC_API_KEY'),
+    // Optional so transcription, clips and web research run without it; AI jobs refuse clearly when it is missing.
+    anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
     anthropicWorkspaceId: process.env.ANTHROPIC_WORKSPACE_ID || undefined,
     transcribeProvider,
     openaiKey: process.env.OPENAI_API_KEY,

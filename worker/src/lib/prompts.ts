@@ -1,7 +1,7 @@
 import type { Segment, SourceRow } from '../types.js';
 import type { Analysis } from './schemas.js';
 
-export const ANALYSIS_PROMPT_VERSION = 'analysis-2026-10-31';
+export const ANALYSIS_PROMPT_VERSION = 'analysis-2026-11-26';
 export const BRIEF_PROMPT_VERSION = 'brief-2026-10-31';
 
 function clock(ms: number | null): string {
@@ -48,6 +48,11 @@ Rules:
 - Do not infer audience sentiment, popularity, virality or public opinion from the source.
 - Flag privacy, allegation, minors, abuse, defamation and rights sensitivities.
 - Passages marked [uncertain transcription] may be wrong; avoid relying on them alone.
+- Commitments: record only concrete undertakings a speaker makes on air ("we will fix the road by Friday"). Copy the
+  commitment words exactly into "quote". If the time is spoken ("by Friday"), copy those words into due_phrase; never
+  invent a date. A promise candidate is a proposal for a producer to confirm, not a fact.
+- Follow-up questions: questions the presenter did not ask or the guest did not answer, written as neutral production
+  prompts tied to the passage that raises them. Never phrase them as accusations.
 ${UNTRUSTED}`;
 
 export const BRIEF_SYSTEM = `You are Orb.IT's editorial strategist. You develop one source into a complete, production-ready

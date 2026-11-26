@@ -14,6 +14,7 @@ export interface GenerateDeps { db: Db; cfg: Config; llm: LlmClient; modules?: M
 interface ShowRow {
   id: string; org_id: string; brand_id: string; name: string; archived_at: string | null;
   current_profile_version_id: string | null;
+  cross_show_recommendation_opt_in?: boolean;
   brands: { name: string; current_profile_version_id: string | null } | null;
 }
 
@@ -108,7 +109,7 @@ export async function runGenerateBriefs(job: JobRow, deps: GenerateDeps): Promis
   const { analysis } = await ensureAnalysis(db, cfg, llm, src, segments);
 
   const transcriptBlock = `SOURCE\n${describeSource(src)}\n\nTRANSCRIPT (cite by [segment number])\n${renderTranscript(segments, src.timestamps_genuine)}`;
-  const shows = must(await db.from('shows').select('id,org_id,brand_id,name,archived_at,current_profile_version_id,brands(name,current_profile_version_id)')
+  const shows = must(await db.from('shows').select('id,org_id,brand_id,name,archived_at,current_profile_version_id,cross_show_recommendation_opt_in,brands(name,current_profile_version_id)')
     .in('id', showIds), 'load shows') as unknown as ShowRow[];
 
   // Retries resume: briefs already created for this group are kept and fed in as siblings.
@@ -130,6 +131,9 @@ export async function runGenerateBriefs(job: JobRow, deps: GenerateDeps): Promis
     if (!show || show.org_id !== src.org_id) { skipped.push({ show: showId, reason: 'not found' }); continue; }
     if (done.some((d) => d.show_id === show.id)) continue;
     if (show.archived_at) { skipped.push({ show: show.name, reason: 'archived' }); continue; }
+    if (show.cross_show_recommendation_opt_in === false && show.id !== src.show_id) {
+      skipped.push({ show: show.name, reason: 'opted out of cross-show recommendations' }); continue;
+    }
     if (!sourceUsableFor(src, show)) { skipped.push({ show: show.name, reason: 'source sharing scope' }); continue; }
     if (!show.current_profile_version_id) { skipped.push({ show: show.name, reason: 'no approved profile' }); continue; }
 

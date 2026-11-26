@@ -26,8 +26,21 @@ export const AnalysisSchema = z.object({
     issue: z.string().describe('Privacy, allegation, minors, abuse, defamation or rights concern.'),
     ...Range,
   })),
+  commitments: z.array(z.object({
+    quote: z.string().max(400).describe('The commitment copied EXACTLY from the cited segments (e.g. "We will fix the road by Friday").'),
+    speaker: z.string().nullable().describe('Speaker label exactly as in the transcript, or null.'),
+    summary: z.string().max(160).describe('Neutral short description: who committed to what.'),
+    due_phrase: z.string().nullable().describe('The time words as spoken, e.g. "by Friday", or null if none.'),
+    ...Range,
+  })).default([]).describe('Concrete on-air commitments or promises by a speaker (will / shall / by <date> / I promise). Not predictions or opinions.'),
+  follow_up_questions: z.array(z.object({
+    question: z.string().describe('A production prompt a later show could ask; not an allegation.'),
+    why: z.string().describe('What in the cited passage leaves this open.'),
+    ...Range,
+  })).default([]).describe('Follow-up questions the programme left unasked or unanswered, each tied to the passage that raises it.'),
 });
-export type Analysis = z.infer<typeof AnalysisSchema>;
+// Input type: commitments and follow-up questions are optional in analyses stored before 26 Nov 2026.
+export type Analysis = z.input<typeof AnalysisSchema>;
 
 // ---------------------------------------------------------------------------
 // Opportunity brief — the complete editable production workspace (spec §8)

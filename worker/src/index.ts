@@ -2,6 +2,7 @@ import { loadConfig } from './config.js';
 import { runAnalyse } from './jobs/analyse.js';
 import { runGenerateBriefs } from './jobs/generateBriefs.js';
 import { runRenderClip } from './jobs/renderClip.js';
+import { runWebResearch } from './jobs/webResearch.js';
 import { runTranscribe } from './jobs/transcribe.js';
 import { makeDb, setSourceStatus } from './lib/db.js';
 import { AnthropicLlm } from './lib/llm.js';
@@ -32,6 +33,7 @@ async function execute(job: JobRow): Promise<Record<string, unknown>> {
     case 'analyse': return runAnalyse(job, { db, cfg, llm, modules });
     case 'generate_briefs': return runGenerateBriefs(job, { db, cfg, llm, modules });
     case 'render_clip': return runRenderClip(job, { db, cfg });
+    case 'web_research': return runWebResearch(job, { db, cfg });
   }
   const owner = modules.ownerOf(job.kind);
   if (!owner) throw new PermanentError(`No installed module handles "${job.kind}" jobs on this worker`);
@@ -75,10 +77,21 @@ async function handle(job: JobRow) {
   }
 }
 
+/** Promise nudges (in-app) are idempotent; run them every few minutes. */
+let lastNudge = 0;
+async function maybeNudge() {
+  if (Date.now() - lastNudge < 5 * 60_000) return;
+  lastNudge = Date.now();
+  const { data, error } = await db.rpc('run_promise_nudges');
+  if (error) log('nudges.error', { error: error.message });
+  else if (data) log('nudges.sent', { count: data });
+}
+
 async function loop() {
   await modules.refresh(true).catch((e) => log('modules.error', { error: (e as Error).message }));
   log('worker.start', { analysis: cfg.analysisModel, brief: cfg.briefModel, modules: modules.summary() });
   while (!stopping) {
+    await maybeNudge();
     const { data, error } = await db.rpc('claim_job', { p_worker: cfg.workerId });
     if (error) {
       // Network failures put the real reason (DNS, TLS, proxy) in details/hint.
