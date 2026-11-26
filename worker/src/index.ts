@@ -1,6 +1,7 @@
 import { loadConfig } from './config.js';
 import { runAnalyse } from './jobs/analyse.js';
 import { runGenerateBriefs } from './jobs/generateBriefs.js';
+import { runRenderClip } from './jobs/renderClip.js';
 import { runTranscribe } from './jobs/transcribe.js';
 import { makeDb, setSourceStatus } from './lib/db.js';
 import { AnthropicLlm } from './lib/llm.js';
@@ -30,6 +31,7 @@ async function execute(job: JobRow): Promise<Record<string, unknown>> {
     }
     case 'analyse': return runAnalyse(job, { db, cfg, llm, modules });
     case 'generate_briefs': return runGenerateBriefs(job, { db, cfg, llm, modules });
+    case 'render_clip': return runRenderClip(job, { db, cfg });
   }
   const owner = modules.ownerOf(job.kind);
   if (!owner) throw new PermanentError(`No installed module handles "${job.kind}" jobs on this worker`);

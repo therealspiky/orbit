@@ -1,8 +1,10 @@
+import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { basename } from 'node:path';
+import { basename, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Config } from '../../config.js';
 import type { Segment } from '../../types.js';
-import { extractAudio, extractAudioChunks } from '../../lib/media.js';
+import { extractAudio, extractAudioChunks, extractPcmF32 } from '../../lib/media.js';
 
 export interface TranscriptResult {
   provider: string;
@@ -121,6 +123,40 @@ export class DeepgramTranscriber implements Transcriber {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Local faster-whisper (no API key, runs on the worker's CPU). Same segment
+// shape as whisper-1; no speaker separation.
+// ---------------------------------------------------------------------------
+const LOCAL_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '../../../py/transcribe_local.py');
+
+export class LocalWhisperTranscriber implements Transcriber {
+  constructor(private cfg: Config) {}
+
+  async transcribe(mediaPath: string, workDir: string, language: string, onProgress: ProgressFn) {
+    const pcm = await extractPcmF32(mediaPath, workDir);
+    await onProgress(20, 'Transcribing on this worker');
+    const out = await new Promise<string>((resolve, reject) => {
+      const p = spawn(this.cfg.whisperPython, [LOCAL_SCRIPT, pcm, this.cfg.whisperModelDir!, language], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+      let last = 0;
+      p.stdout.on('data', (d) => (stdout += d));
+      p.stderr.on('data', (d) => {
+        stderr += d;
+        const m = /progress (\d+)\s*$/.exec(String(d));
+        const pct = m ? Number(m[1]) : NaN;
+        if (Number.isFinite(pct) && pct - last >= 10) { last = pct; void onProgress(20 + Math.round(pct * 0.7), `Transcribing (${pct}%)`); }
+      });
+      p.on('error', reject);
+      p.on('close', (code) => (code === 0 ? resolve(stdout) : reject(new Error(`local transcription exited ${code}: ${stderr.slice(-500)}`))));
+    });
+    const body = JSON.parse(out) as { model: string; segments: WhisperSegment[] };
+    return { provider: 'local', model: body.model, segments: mapWhisperSegments(body.segments, 0, 0) };
+  }
+}
+
 export function makeTranscriber(cfg: Config): Transcriber {
-  return cfg.transcribeProvider === 'deepgram' ? new DeepgramTranscriber(cfg) : new OpenAITranscriber(cfg);
+  if (cfg.transcribeProvider === 'deepgram') return new DeepgramTranscriber(cfg);
+  if (cfg.transcribeProvider === 'local') return new LocalWhisperTranscriber(cfg);
+  return new OpenAITranscriber(cfg);
 }
